@@ -1,0 +1,69 @@
+---
+# Kubespray Cluster Configuration
+# This file contains the main configuration for your Kubernetes cluster
+
+# Kubernetes version
+kube_version: v1.28.5
+
+# Container runtime (containerd is recommended)
+container_manager: containerd
+
+# Network plugin (Calico is popular and well-tested)
+kube_network_plugin: calico
+
+# Service and Pod CIDR
+kube_service_addresses: 10.233.0.0/18
+kube_pods_subnet: 10.233.64.0/18
+
+# DNS configuration
+dns_mode: coredns
+enable_nodelocaldns: true
+
+# Enable Kubernetes dashboard
+dashboard_enabled: true
+
+# Enable metrics server
+metrics_server_enabled: true
+
+# Helm deployment
+helm_enabled: true
+
+# Enable cert-manager for TLS certificate management
+cert_manager_enabled: false
+
+# Ingress controller
+ingress_nginx_enabled: true
+ingress_nginx_host_network: true
+
+# Kubelet configuration
+kubelet_max_pods: 110
+kubelet_authentication_token_webhook: true
+
+# API server configuration
+kube_apiserver_enable_admission_plugins:
+  - NodeRestriction
+  - PodSecurityPolicy
+  - ServiceAccount
+
+# Enable audit logging
+kubernetes_audit: true
+
+# Container image repo
+kube_image_repo: "registry.k8s.io"
+
+# Download locations
+kubelet_download_url: "https://storage.googleapis.com/kubernetes-release/release/{{ kube_version }}/bin/linux/{{ image_arch }}/kubelet"
+kubectl_download_url: "https://storage.googleapis.com/kubernetes-release/release/{{ kube_version }}/bin/linux/{{ image_arch }}/kubectl"
+
+# Cluster name
+cluster_name: sytoss-k8s-cluster
+
+# Cloud provider (none for self-managed)
+cloud_provider: gce
+
+# Enable persistent volumes
+persistent_volumes_enabled: true
+
+# Configure automatic certificate rotation
+kubelet_rotate_certificates: true
+kubelet_rotate_server_certificates: true

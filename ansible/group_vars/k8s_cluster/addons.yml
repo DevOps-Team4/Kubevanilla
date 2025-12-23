@@ -1,0 +1,44 @@
+---
+# Kubespray Addons Configuration
+# Configure additional components for your Kubernetes cluster
+
+# Metrics Server - Required for HPA and kubectl top
+metrics_server_enabled: true
+metrics_server_replicas: 1
+
+# Kubernetes Dashboard
+dashboard_enabled: true
+dashboard_skip_login: false
+
+# Ingress NGINX Controller
+ingress_nginx_enabled: true
+ingress_nginx_namespace: ingress-nginx
+ingress_nginx_insecure_port: 80
+ingress_nginx_secure_port: 443
+
+# Helm package manager
+helm_enabled: true
+helm_version: v3.13.0
+
+# MetalLB Load Balancer (for bare metal/self-managed clusters)
+metallb_enabled: false
+metallb_speaker_enabled: false
+metallb_ip_range:
+  - "10.1.1.200-10.1.1.250"
+
+# Local Path Provisioner for persistent volumes
+local_path_provisioner_enabled: true
+local_path_provisioner_namespace: local-path-storage
+local_path_provisioner_storage_class: local-path
+local_path_provisioner_reclaim_policy: Delete
+local_volume_provisioner_base_dir: /opt/local-path-provisioner
+
+# Cert Manager for TLS certificates
+cert_manager_enabled: false
+cert_manager_namespace: cert-manager
+
+# Registry configuration
+registry_enabled: false
+
+# Persistent volume configuration
+persistent_volumes_enabled: true
