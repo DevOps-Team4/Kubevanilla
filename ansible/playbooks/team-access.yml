@@ -1,0 +1,41 @@
+---
+- name: Configure team access on all hosts
+  hosts: k8s-cluster:postgres-db
+  become: true
+  vars_files:
+    - ../group_vars/all/secret.yml
+  
+  tasks:
+    - name: Create team users
+      user:
+        name: "{{ item }}"
+        shell: /bin/bash
+        create_home: yes
+        groups: sudo
+        append: yes
+        state: present
+      loop: "{{ team_users }}"
+    
+    - name: Set up SSH keys for team users
+      authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ item.key }}"
+        state: present
+      loop: "{{ team_ssh_keys }}"
+    
+    - name: Configure sudo without password for team users
+      lineinfile:
+        path: /etc/sudoers.d/{{ item }}
+        line: "{{ item }} ALL=(ALL) NOPASSWD:ALL"
+        create: yes
+        mode: '0440'
+      loop: "{{ team_users }}"
+    
+    - name: Ensure SSH directory exists for team users
+      file:
+        path: "/home/{{ item }}/.ssh"
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: '0700'
+      loop: "{{ team_users }}"

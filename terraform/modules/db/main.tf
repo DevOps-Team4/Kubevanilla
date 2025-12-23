@@ -35,23 +35,13 @@ resource "google_compute_instance" "postgres" {
     ssh-keys = "${var.provisioning_user}:${var.provisioning_public_key}"
   }
 
-  metadata_startup_script = <<-EOF
-    #!/bin/bash
-    # Basic system setup - packages will be installed via Ansible
-    apt-get update
-    
-    # Create user provisioning і sudo without password
-    useradd -m -s /bin/bash ${var.provisioning_user} || true
-    mkdir -p /home/${var.provisioning_user}/.ssh
-    echo "${var.provisioning_public_key}" > /home/${var.provisioning_user}/.ssh/authorized_keys
-    chmod 600 /home/${var.provisioning_user}/.ssh/authorized_keys
-    chown -R ${var.provisioning_user}:${var.provisioning_user} /home/${var.provisioning_user}/.ssh
-
-    echo "${var.provisioning_user} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${var.provisioning_user}
-    chmod 440 /etc/sudoers.d/${var.provisioning_user}
-
-    # Create marker file to indicate VM is ready for Ansible
-    touch /tmp/terraform-setup-complete
-    echo "Instance postgres_db ready for Ansible configuration" > /var/log/terraform-setup.log
-  EOF
+  metadata_startup_script = templatefile("${path.module}/startup.sh", {
+    DB_PORT           = var.db_port
+    POSTGRES_USER     = var.postgres_user
+    POSTGRES_PASSWORD = var.postgres_password
+    POSTGRES_DB       = var.postgres_db
+    DOCKER_IMAGE      = var.docker_image
+    PROVISIONING_USER = var.provisioning_user
+    PROVISIONING_KEY  = var.provisioning_public_key
+  })
 }

@@ -1,4 +1,3 @@
 terraform-sa-key.json
 .terraform/
 .terraform.lock.hcl
-terraform-key.json

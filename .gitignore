@@ -1,5 +1,6 @@
 /terraform/modules/db/terraform.tfvars
 /terraform/terraform.tfvars
+/terraform/.ssh
 
 .terraform/
 *.tfstate

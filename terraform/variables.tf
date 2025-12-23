@@ -40,6 +40,11 @@ variable "enable_nat_gateway" {
   default     = true
 }
 
+variable "zone" {
+  description = "Default GCP zone"
+  type        = string
+}
+
 # Database variables
 variable "db" {
   description = "Database configuration"
@@ -56,11 +61,6 @@ variable "db" {
   })
 }
 
-variable "zone" {
-  description = "GCP zone"
-  type        = string
-}
-
 variable "postgres_user" {
   description = "PostgreSQL username"
   type        = string
@@ -72,9 +72,26 @@ variable "postgres_password" {
   sensitive   = true
 }
 
-# Instance variables
+# External database configuration (for applications)
+variable "external_database" {
+  description = "External database configuration for applications"
+  type = object({
+    host = string
+    port = number
+    name = string
+    user = string
+  })
+  default = {
+    host = ""
+    port = 5432
+    name = ""
+    user = ""
+  }
+}
+
+# Kubernetes VM instances variables
 variable "vm_instances" {
-  description = "VM instances configuration"
+  description = "Kubernetes VM instances configuration"
   type = list(object({
     name         = string
     machine_type = string
@@ -82,7 +99,7 @@ variable "vm_instances" {
     subnet       = string
     public_ip    = bool
     tags         = list(string)
-    ports        = list(number)  # Keep for firewall rules
+    ports        = list(number) # Keep for firewall rules
     os_image     = string
     disk_size_gb = number
   }))
