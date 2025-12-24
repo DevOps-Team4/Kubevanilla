@@ -1,8 +1,8 @@
 ---
 - name: Prepare servers for automation (disable apt auto-updates safely)
   hosts: all
-  become: yes
-  gather_facts: yes
+  become: true
+  gather_facts: true
 
   vars:
     apt_lock_files:
@@ -20,14 +20,14 @@
         name: "{{ item }}"
         state: stopped
         enabled: no
-        masked: yes
+        masked: true
       loop:
         - apt-daily.timer
         - apt-daily-upgrade.timer
         - apt-daily
         - apt-daily-upgrade
         - unattended-upgrades
-      ignore_errors: yes
+      ignore_errors: true
 
     # ------------------------------------------------------------
     # 2. Wait for any currently running apt/dpkg processes to finish
