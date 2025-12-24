@@ -10,6 +10,7 @@ resource "google_compute_instance" "vm" {
   machine_type = each.value.machine_type
   zone         = each.value.zone
   tags         = each.value.tags
+  allow_stopping_for_update = true
 
   labels = {
     application = "app"
@@ -34,27 +35,45 @@ resource "google_compute_instance" "vm" {
   }
 
   metadata = {
-    ssh-keys = "${var.provisioning_user}:${var.provisioning_public_key}"
+    # SSH keys will be handled by GCP metadata or Ansible
+    enable-oslogin = "FALSE"
+    ssh-keys = "provisioning:${var.ssh_public_key}"
   }
 
   metadata_startup_script = <<-EOF
     #!/bin/bash
-    # Basic system setup - packages will be installed via Ansible
-    apt-get update
+    # Fast setup - only SSH keys, let Ansible handle packages
     
-    # Create user provisioning і sudo without password
-    useradd -m -s /bin/bash ${var.provisioning_user} || true
-    mkdir -p /home/${var.provisioning_user}/.ssh
-    echo "${var.provisioning_public_key}" > /home/${var.provisioning_user}/.ssh/authorized_keys
-    chmod 600 /home/${var.provisioning_user}/.ssh/authorized_keys
-    chown -R ${var.provisioning_user}:${var.provisioning_user} /home/${var.provisioning_user}/.ssh
-
-    echo "${var.provisioning_user} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${var.provisioning_user}
-    chmod 440 /etc/sudoers.d/${var.provisioning_user}
-
-    # Create marker file to indicate VM is ready for Ansible
-    touch /tmp/terraform-setup-complete
-    echo "Instance ${each.value.name} ready for Ansible configuration" > /var/log/terraform-setup.log
+    %{if contains(each.value.tags, "bastion")}
+    # Setup SSH private key for bastion host to access other nodes
+    mkdir -p /home/provisioning/.ssh
+    chown provisioning:provisioning /home/provisioning/.ssh
+    chmod 700 /home/provisioning/.ssh
+    
+    # Create the private key file
+    cat > /home/provisioning/.ssh/provisioning_key << 'PRIVATE_KEY_EOF'
+${var.ssh_private_key}
+PRIVATE_KEY_EOF
+    
+    # Set correct permissions
+    chown provisioning:provisioning /home/provisioning/.ssh/provisioning_key
+    chmod 600 /home/provisioning/.ssh/provisioning_key
+    
+    # Create SSH config for easier access
+    cat > /home/provisioning/.ssh/config << 'SSH_CONFIG_EOF'
+Host *
+    IdentityFile ~/.ssh/provisioning_key
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+SSH_CONFIG_EOF
+    
+    chown provisioning:provisioning /home/provisioning/.ssh/config
+    chmod 600 /home/provisioning/.ssh/config
+    %{endif}
+    
+    # Mark as ready for Ansible configuration
+    touch /tmp/terraform-provisioning-complete
+    echo "$(date): Instance ${each.value.name} ready for Ansible configuration" > /var/log/terraform-setup.log
   EOF
 
   service_account {

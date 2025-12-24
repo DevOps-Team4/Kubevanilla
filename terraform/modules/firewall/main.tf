@@ -1,4 +1,4 @@
-# Bastion Security - SSH from internet
+# Bastion Host - SSH from internet
 resource "google_compute_firewall" "bastion_ssh" {
   name    = "fw-bastion-ssh-${var.environment}"
   network = var.network_name
@@ -10,40 +10,40 @@ resource "google_compute_firewall" "bastion_ssh" {
   
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["bastion"]
-  description   = "Allow SSH to bastion from anywhere"
+  description   = "Allow SSH to bastion host from anywhere"
 }
 
-# Frontend Security - HTTP/HTTPS from internet
-resource "google_compute_firewall" "frontend_web" {
-  name    = "fw-frontend-web-${var.environment}"
+# Kubernetes Master API Server - External access
+resource "google_compute_firewall" "k8s_api_external" {
+  name    = "fw-k8s-api-external-${var.environment}"
   network = var.network_name
   
   allow {
     protocol = "tcp"
-    ports    = ["80", "443", "8081", "4200"]
+    ports    = ["6443"]
   }
   
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["frontend"]
-  description   = "Allow HTTP/HTTPS and custom 8081 to frontend"
+  target_tags   = ["k8s-master"]
+  description   = "Allow external access to Kubernetes API server"
 }
 
-# Backend Security - API access from frontend only
-resource "google_compute_firewall" "backend_api" {
-  name    = "fw-backend-api-${var.environment}"
+# SSH Access - From bastion to Kubernetes nodes only
+resource "google_compute_firewall" "k8s_ssh_from_bastion" {
+  name    = "fw-k8s-ssh-from-bastion-${var.environment}"
   network = var.network_name
   
   allow {
     protocol = "tcp"
-    ports    = ["8080"]
+    ports    = ["22"]
   }
   
-  source_tags = ["frontend"]
-  target_tags = ["backend"]
-  description = "Allow API traffic from frontend to backend"
+  source_tags = ["bastion"]
+  target_tags = ["k8s-master", "k8s-worker", "kubernetes", "postgres"]
+  description = "Allow SSH to Kubernetes nodes and database from bastion host only"
 }
 
-# Database Security - Access from backend only
+# Database Security - Access from Kubernetes nodes only
 resource "google_compute_firewall" "database_access" {
   name    = "fw-database-access-${var.environment}"
   network = var.network_name
@@ -53,29 +53,74 @@ resource "google_compute_firewall" "database_access" {
     ports    = ["5432"]
   }
   
-  source_tags = ["backend"]
+  source_tags = ["kubernetes", "k8s-master", "k8s-worker"]
   target_tags = ["postgres"]
-  description = "Allow database access from backend"
+  description = "Allow database access from Kubernetes nodes"
 }
 
-# Internal SSH - SSH from bastion to all instances
-resource "google_compute_firewall" "internal_ssh" {
-  name    = "fw-internal-ssh-${var.environment}"
+# Kubernetes Master-to-Master Communication
+resource "google_compute_firewall" "k8s_master_internal" {
+  name    = "fw-k8s-master-internal-${var.environment}"
   network = var.network_name
   
   allow {
     protocol = "tcp"
-    ports    = ["22"]
+    ports    = ["2379", "2380", "10250", "10251", "10252"]
   }
   
-  source_tags = ["bastion"]
-  target_tags = ["frontend", "backend", "postgres"]
-  description = "Allow SSH from bastion to all instances"
+  source_tags = ["k8s-master"]
+  target_tags = ["k8s-master"]
+  description = "Allow communication between Kubernetes masters"
 }
 
-# Internal Communication - All traffic within VPC
-resource "google_compute_firewall" "internal_all" {
-  name    = "fw-internal-all-${var.environment}"
+# Kubernetes Master-to-Worker Communication
+resource "google_compute_firewall" "k8s_master_to_worker" {
+  name    = "fw-k8s-master-to-worker-${var.environment}"
+  network = var.network_name
+  
+  allow {
+    protocol = "tcp"
+    ports    = ["10250"]
+  }
+  
+  source_tags = ["k8s-master"]
+  target_tags = ["k8s-worker"]
+  description = "Allow Kubernetes master to communicate with workers"
+}
+
+# Kubernetes Worker-to-Master Communication
+resource "google_compute_firewall" "k8s_worker_to_master" {
+  name    = "fw-k8s-worker-to-master-${var.environment}"
+  network = var.network_name
+  
+  allow {
+    protocol = "tcp"
+    ports    = ["6443"]
+  }
+  
+  source_tags = ["k8s-worker"]
+  target_tags = ["k8s-master"]
+  description = "Allow Kubernetes workers to communicate with API server"
+}
+
+# NodePort Services - External access
+resource "google_compute_firewall" "k8s_nodeport" {
+  name    = "fw-k8s-nodeport-${var.environment}"
+  network = var.network_name
+  
+  allow {
+    protocol = "tcp"
+    ports    = ["30000-32767"]
+  }
+  
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["kubernetes"]
+  description   = "Allow NodePort services external access"
+}
+
+# Internal Communication - All traffic within VPC for Kubernetes
+resource "google_compute_firewall" "k8s_internal_all" {
+  name    = "fw-k8s-internal-all-${var.environment}"
   network = var.network_name
   
   allow {
@@ -93,5 +138,20 @@ resource "google_compute_firewall" "internal_all" {
   }
   
   source_ranges = [var.vpc_cidr]
-  description   = "Allow all internal communication within VPC"
+  description   = "Allow all internal communication within VPC for Kubernetes"
+}
+
+# HTTPS for Load Balancers and Ingress
+resource "google_compute_firewall" "k8s_https" {
+  name    = "fw-k8s-https-${var.environment}"
+  network = var.network_name
+  
+  allow {
+    protocol = "tcp"
+    ports    = ["443", "80"]
+  }
+  
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["kubernetes"]
+  description   = "Allow HTTP/HTTPS for Kubernetes ingress and load balancers"
 }

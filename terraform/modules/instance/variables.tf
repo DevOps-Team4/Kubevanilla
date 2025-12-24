@@ -26,12 +26,13 @@ variable "network_name" {
   description = "VPC network name for instances"
 }
 
-variable "provisioning_public_key" {
+variable "ssh_public_key" {
   type        = string
-  description = "Public key for provisioning user (used by Ansible)"
+  description = "SSH public key for provisioning access"
 }
 
-variable "provisioning_user" {
+variable "ssh_private_key" {
   type        = string
-  description = "User for Ansible provisioning"
+  description = "SSH private key for provisioning access (will be placed on bastion)"
+  sensitive   = true
 }

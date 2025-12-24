@@ -46,18 +46,49 @@ output "firewall_rule_names" {
   value       = module.firewall.firewall_rule_names
 }
 
-output "instance_ips" {
-  value = module.instances.instance_ips
+# Kubernetes Cluster Outputs
+output "bastion_host_ip" {
+  description = "Public IP address of the bastion host"
+  value = try([
+    for name, ip in module.instances.public_ips : ip
+    if contains([for vm in var.vm_instances : vm.name if contains(vm.tags, "bastion")], name)
+  ][0], null)
 }
 
-output "db_private_ip" {
-  value = module.db.private_ip
+output "kubernetes_master_ips" {
+  description = "IP addresses of Kubernetes master nodes"
+  value = {
+    for name, ip in module.instances.public_ips : name => ip
+    if contains([for vm in var.vm_instances : vm.name if contains(vm.tags, "k8s-master")], name)
+  }
 }
 
-output "provisioning_user" {
-  value = "provisioning"
+output "kubernetes_worker_ips" {
+  description = "IP addresses of Kubernetes worker nodes"
+  value = {
+    for name, ip in module.instances.private_ips : name => ip
+    if contains([for vm in var.vm_instances : vm.name if contains(vm.tags, "k8s-worker")], name)
+  }
 }
 
-output "provisioning_key_path" {
-  value = local_file.provisioning_private_key.filename
+output "all_instance_ips" {
+  description = "All instance IP addresses"
+  value       = merge(module.instances.public_ips, module.instances.private_ips)
+}
+
+output "database_private_ip" {
+  description = "Private IP address of the database"
+  value       = module.db.private_ip
+}
+
+output "kubespray_inventory_path" {
+  description = "Path to the generated Kubespray inventory file"
+  value       = local_file.kubespray_inventory.filename
+}
+
+# External database configuration (for reference)
+output "external_database_config" {
+  description = "External database configuration for applications"
+  value       = var.external_database
+  sensitive   = false
 }

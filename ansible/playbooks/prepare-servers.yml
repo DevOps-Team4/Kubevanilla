@@ -1,49 +1,68 @@
 ---
 - name: Prepare servers for automation (disable apt auto-updates safely)
   hosts: all
-  become: true
-  gather_facts: true
+  become: yes
+  gather_facts: yes
+
+  vars:
+    apt_lock_files:
+      - /var/lib/dpkg/lock
+      - /var/lib/apt/lists/lock
+      - /var/cache/apt/archives/lock
 
   tasks:
 
-    - name: Kill cloud-init and unattended-upgrade processes
-      shell: pkill -9 -f cloud-init || true; pkill -9 -f unattended-upgrade || true
-      changed_when: false
-      ignore_errors: true
-
-    - name: Wait for apt locks to clear
-      wait_for:
-        path: /var/lib/apt/lists/lock
-        state: absent
-        timeout: 60
-      ignore_errors: true
-
+    # ------------------------------------------------------------
+    # 1. Stop and disable all automatic apt mechanisms
+    # ------------------------------------------------------------
     - name: Stop and disable apt timers and services
       systemd:
         name: "{{ item }}"
         state: stopped
-        enabled: false
-        masked: true
+        enabled: no
+        masked: yes
       loop:
         - apt-daily.timer
         - apt-daily-upgrade.timer
         - apt-daily
         - apt-daily-upgrade
         - unattended-upgrades
-      ignore_errors: true
+      ignore_errors: yes
 
-    - name: Fix dpkg if in inconsistent state
+    # ------------------------------------------------------------
+    # 2. Wait for any currently running apt/dpkg processes to finish
+    # ------------------------------------------------------------
+    - name: Wait until apt/dpkg locks are released
+      shell: |
+        for lock in {{ apt_lock_files | join(' ') }}; do
+          while fuser "$lock" >/dev/null 2>&1; do
+            sleep 3
+          done
+        done
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # ------------------------------------------------------------
+    # 3. Ensure dpkg is not left in half-configured state
+    # ------------------------------------------------------------
+    - name: Ensure dpkg database is consistent
       command: dpkg --configure -a
       changed_when: false
-      ignore_errors: true
 
+    # ------------------------------------------------------------
+    # 4. Remove unattended-upgrades package safely
+    # ------------------------------------------------------------
     - name: Remove unattended-upgrades package
       apt:
         name: unattended-upgrades
         state: absent
-      ignore_errors: true
+        lock_timeout: 60
 
-    - name: Disable periodic apt updates
+    # ------------------------------------------------------------
+    # 5. Permanently disable all periodic apt actions
+    # ------------------------------------------------------------
+    - name: Disable all periodic apt actions
       copy:
         dest: /etc/apt/apt.conf.d/20auto-upgrades
         owner: root
@@ -54,14 +73,18 @@
           APT::Periodic::Unattended-Upgrade "0";
           APT::Periodic::Download-Upgradeable-Packages "0";
           APT::Periodic::AutocleanInterval "0";
-      ignore_errors: true
 
-    - name: Create update-manager directory if needed
+    # ------------------------------------------------------------
+    # 6. (Optional but recommended) Disable release upgrade prompts (Ubuntu only)
+    # ------------------------------------------------------------
+    - name: Create update-manager directory if it doesn't exist
       file:
         path: /etc/update-manager
         state: directory
+        owner: root
+        group: root
         mode: '0755'
-      ignore_errors: true
+      when: ansible_distribution == "Ubuntu"
 
     - name: Disable release upgrade prompts
       copy:
@@ -72,8 +95,4 @@
         content: |
           [DEFAULT]
           Prompt=never
-      ignore_errors: true
-
-    - name: Verify apt is ready
-      command: apt --version
-      changed_when: false
+      when: ansible_distribution == "Ubuntu"

@@ -11,19 +11,22 @@ output "instance_ips" {
   description = "Map of instance names to their IP configurations"
 }
 
-output "bastion_ip" {
-  value = try(
-    [for vm in google_compute_instance.vm : vm.network_interface[0].access_config[0].nat_ip if contains(vm.tags, "bastion")][0],
-    null
-  )
+# Separate outputs for public and private IPs
+output "public_ips" {
+  value = {
+    for name, vm in google_compute_instance.vm :
+    name => vm.network_interface[0].access_config[0].nat_ip
+    if length(vm.network_interface[0].access_config) > 0
+  }
+  description = "Public IP addresses of instances"
 }
 
-output "frontend_private_ip" {
-  value = [for vm in google_compute_instance.vm : vm.network_interface[0].network_ip if contains(vm.tags, "frontend")][0]
-}
-
-output "backend_private_ip" {
-  value = [for vm in google_compute_instance.vm : vm.network_interface[0].network_ip if contains(vm.tags, "backend")][0]
+output "private_ips" {
+  value = {
+    for name, vm in google_compute_instance.vm :
+    name => vm.network_interface[0].network_ip
+  }
+  description = "Private IP addresses of all instances"
 }
 
 output "instance_self_links" {
