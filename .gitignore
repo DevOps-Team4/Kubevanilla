@@ -9,3 +9,7 @@
 terraform-sa-key.json
 terraform-sa-key-backup.json
 terraform/terraform-key.json
+terraform-sa-key.json
+./ansible/kubespray
+./ansible/group_vars
+./ansible/kubespray

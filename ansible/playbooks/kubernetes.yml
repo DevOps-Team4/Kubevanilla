@@ -61,6 +61,32 @@
   become: true
   
   tasks:
+    - name: Check and resolve apt-get lock issues
+      shell: |
+        # Check if apt-get is running
+        if pgrep -f "apt-get|apt|dpkg" > /dev/null; then
+          echo "Waiting for apt processes to finish..."
+          timeout 60 bash -c 'while pgrep -f "apt-get|apt|dpkg" > /dev/null; do sleep 2; done' || true
+        fi
+        
+        # Fix interrupted dpkg configuration
+        if dpkg -l | grep -q "^..r"; then
+          echo "Fixing interrupted dpkg configuration..."
+          sudo dpkg --configure -a || true
+        fi
+        
+        # Remove stale locks if they exist and no process is using them
+        if [ -f /var/lib/dpkg/lock-frontend ] && ! lsof /var/lib/dpkg/lock-frontend > /dev/null 2>&1; then
+          sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock
+          echo "Removed stale lock files"
+        fi
+        
+        # Stop unattended-upgrades if running to prevent conflicts
+        sudo systemctl stop unattended-upgrades 2>/dev/null || true
+      when: ansible_os_family == "Debian"
+      changed_when: false
+      failed_when: false
+
     - name: Update apt cache
       apt:
         update_cache: yes
@@ -105,9 +131,19 @@
         - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
         - { name: 'net.ipv4.ip_forward', value: '1' }
 
+    - name: Check memory requirements for control plane
+      assert:
+        that:
+          - ansible_memtotal_mb >= (minimal_master_memory_mb | default(1500))
+        fail_msg: "Control plane node {{ inventory_hostname }} has insufficient memory. Minimum required: {{ minimal_master_memory_mb | default(1500) }} MB, current: {{ ansible_memtotal_mb }} MB. Please increase VM memory in GCP or set minimal_master_memory_mb in group_vars."
+        success_msg: "Control plane node {{ inventory_hostname }} has sufficient memory: {{ ansible_memtotal_mb }} MB (required: {{ minimal_master_memory_mb | default(1500) }} MB)"
+      when:
+        - ('kube_control_plane' in group_names)
+        - ansible_memtotal_mb is defined
+
     - name: Display node preparation status
       debug:
-        msg: "Node {{ inventory_hostname }} prepared for Kubernetes installation"
+        msg: "Node {{ inventory_hostname }} prepared for Kubernetes installation (Memory: {{ ansible_memtotal_mb | default('N/A') }} MB)"
 
 - name: Execute Kubespray Cluster Deployment
   hosts: localhost
@@ -117,6 +153,31 @@
     k8s_inventory: "{{ playbook_dir }}/../k8s-inventory.ini"
   
   tasks:
+    - name: Check if Ansible is updated on bastion (required for Kubespray)
+      command: ansible bastion -i {{ k8s_inventory }} -m command -a "ansible --version" -o
+      register: bastion_ansible_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display bastion Ansible version
+      debug:
+        msg: "Bastion Ansible version check: {{ bastion_ansible_check.stdout | default('Could not check') }}"
+
+    - name: Warn if bastion Ansible version is too old
+      fail:
+        msg: |
+          Bastion has Ansible version < 2.17.3. Please update it first:
+          
+          Run: ansible-playbook -i {{ k8s_inventory }} playbooks/bastion.yml
+          
+          This will update Ansible on bastion to the required version (2.17.3+).
+      when: 
+        - bastion_ansible_check.rc != 0 or
+          (bastion_ansible_check.rc == 0 and 
+           ('2.17' not in (bastion_ansible_check.stdout | default('')) and 
+            '2.18' not in (bastion_ansible_check.stdout | default('')) and
+            '2.19' not in (bastion_ansible_check.stdout | default('')) and
+            '2.20' not in (bastion_ansible_check.stdout | default(''))))
     - name: Display Kubespray execution information
       debug:
         msg:
@@ -135,10 +196,12 @@
     - name: Run Kubespray cluster.yml playbook
       shell: |
         cd {{ kubespray_dir }}
+        export ANSIBLE_ROLES_PATH={{ kubespray_dir }}/roles:$ANSIBLE_ROLES_PATH
+        export ANSIBLE_LIBRARY={{ kubespray_dir }}/library:$ANSIBLE_LIBRARY
         ansible-playbook -i {{ k8s_inventory }} \
           --become \
           --become-user=root \
-          cluster.yml
+          playbooks/cluster.yml
       register: kubespray_output
       changed_when: true
 
