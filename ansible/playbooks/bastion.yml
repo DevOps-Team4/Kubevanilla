@@ -4,40 +4,45 @@
   become: true
 
   tasks:
-    - name: Check current Ansible version
-      command: ansible --version
-      register: ansible_version_check
-      changed_when: false
-      failed_when: false
-
-    - name: Display current Ansible version
-      debug:
-        msg: "Current Ansible version: {{ ansible_version_check.stdout_lines[0] | default('Unknown') }}"
-
     - name: Install Python3 and pip if not present
       apt:
         name:
           - python3
           - python3-pip
+          - curl
         state: present
         update_cache: yes
 
-    - name: Install/Upgrade Ansible to required version (2.17.3+ but < 2.18.0)
-      pip:
-        name: "ansible>=2.17.3,<2.18.0"
-        state: present
-        executable: pip3
-        upgrade: yes
-      register: ansible_install
+    - name: Download kubectl binary
+      get_url:
+        url: "https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl"
+        dest: /tmp/kubectl
+        mode: '0755'
 
-    - name: Verify Ansible version after installation
-      command: ansible --version
-      register: ansible_version_after
+    - name: Install kubectl
+      copy:
+        src: /tmp/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: yes
+
+    - name: Verify kubectl installation
+      command: kubectl version --client
+      register: kubectl_version
       changed_when: false
 
-    - name: Display installed Ansible version
+    - name: Display kubectl version
       debug:
-        msg: "Installed Ansible version: {{ ansible_version_after.stdout_lines[0] }}"
+        msg: "kubectl version: {{ kubectl_version.stdout_lines[0] }}"
+
+    - name: Enable kubectl autocompletion for bash
+      lineinfile:
+        path: /etc/bash.bashrc
+        line: 'source <(kubectl completion bash)'
+        create: yes
+
     - name: Create team users
       user:
         name: "{{ item }}"

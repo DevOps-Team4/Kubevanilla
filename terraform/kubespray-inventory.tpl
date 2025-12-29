@@ -38,7 +38,7 @@ all:
     calico_rr:
       hosts: {}
   vars:
-    # SSH configuration will be handled by your Ansible configuration
-    # Configure ansible_user, ansible_ssh_private_key_file, and proxy settings
-    # in your ansible.cfg or inventory as needed
-    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    ansible_user: provisioning
+    ansible_ssh_private_key_file: ~/.ssh/provisioning_key
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/provisioning_key provisioning@${bastion_ip}"'
+    ansible_python_interpreter: /usr/bin/python3

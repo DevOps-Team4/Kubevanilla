@@ -130,16 +130,24 @@ resource "local_file" "kubespray_inventory" {
   filename = "${path.module}/../kubespray/inventory/k8s-cluster/hosts.yaml"
 
   content = templatefile("${path.module}/kubespray-inventory.tpl", {
+    bastion_ip = try([
+      for name, ip in module.instances.public_ips : ip
+      if contains([for vm in var.vm_instances : vm.name if contains(vm.tags, "bastion")], name)
+    ][0], null)
+    
     masters = [for vm in var.vm_instances : {
       name         = vm.name
-      ip           = vm.subnet == "public" ? module.instances.public_ips[vm.name] : module.instances.private_ips[vm.name]
-      ansible_host = vm.subnet == "public" ? module.instances.public_ips[vm.name] : module.instances.private_ips[vm.name]
+      # Use private IP for Ansible access (via bastion), but keep public IP for access_ip
+      ip           = module.instances.private_ips[vm.name]
+      ansible_host = module.instances.private_ips[vm.name]
+      public_ip    = vm.public_ip ? module.instances.public_ips[vm.name] : null
     } if contains(vm.tags, "k8s-master")]
 
     workers = [for vm in var.vm_instances : {
       name         = vm.name
-      ip           = vm.subnet == "public" ? module.instances.public_ips[vm.name] : module.instances.private_ips[vm.name]
-      ansible_host = vm.subnet == "public" ? module.instances.public_ips[vm.name] : module.instances.private_ips[vm.name]
+      ip           = module.instances.private_ips[vm.name]
+      ansible_host = module.instances.private_ips[vm.name]
+      public_ip    = vm.public_ip && vm.subnet == "public" ? module.instances.public_ips[vm.name] : null
     } if contains(vm.tags, "k8s-worker")]
   })
 }
