@@ -47,21 +47,17 @@ This document provides a complete guide for deploying and accessing a self-manag
 - gcloud CLI (for GCP authentication)
 ```
 
-### Required Ansible Collections
-```bash
-# Install required Ansible collections (run after activating virtual environment)
-ansible-galaxy collection install ansible.posix
-ansible-galaxy collection install community.general:8.6.1
-ansible-galaxy collection install kubernetes.core
-ansible-galaxy collection install ansible.utils
-```
-
 ### GCP Setup
 1. Service account key: `terraform/terraform-sa-key.json`
 2. Backend bucket: `terraform-11-12-2025-sytoss-bucket`
 3. Project ID: `terraform-test-480809`
 
 ---
+
+```bash
+cp path-to-your-repo/Kubevanilla ~/Kubevanilla 
+(it will be better)
+```
 
 ## 🚀 Deployment Steps
 
@@ -93,9 +89,6 @@ source .venv/bin/activate
 
 # Install required Ansible version
 pip install 'ansible-core>=2.17.3,<2.18.0'
-
-# Install required Python libraries for Ansible filters
-pip install netaddr
 
 # Verify installation
 ansible --version
@@ -206,9 +199,6 @@ source .venv/bin/activate
 
 cd ansible/kubespray
 
-# Install required Ansible collections for root user
-ansible-galaxy collection install --force ansible.posix community.general kubernetes.core ansible.utils
-
 # Deploy Kubernetes cluster
 ansible-playbook \
   -i ../../kubespray/inventory/k8s-cluster/hosts.yaml \
@@ -241,6 +231,9 @@ The playbook shows task execution with timestamps. Key phases:
 
 ```bash
 cd ansible
+
+change the path on your ansible.cfg 
+change inventory.ini bastion host 
 
 # Install kubectl on bastion and configure team access
 ansible-playbook \
@@ -278,6 +271,8 @@ k8s-worker-2   Ready    <none>          40m   v1.34.3
 ```
 
 ---
+if something goes wrong
+ansible-playbook   -i inventory.ini   playbooks/setup-kubeconfig.yml   --vault-password-file .vault_pass
 
 ## ✅ Verification Commands
 
@@ -553,44 +548,6 @@ terraform refresh -var-file=values/stage.tfvars
 terraform import -var-file=values/stage.tfvars \
   google_compute_instance.vm["bastion-host"] \
   projects/terraform-test-480809/zones/europe-west3-a/instances/bastion-host
-```
-
-### Issue: Ansible Collection Module Not Found
-```bash
-# If you see errors like "couldn't resolve module/action 'ansible.posix.mount'"
-# or "couldn't resolve module/action 'community.general.ini_file'"
-
-# Install required collections for root user (if running as root)
-ansible-galaxy collection install --force ansible.posix community.general kubernetes.core ansible.utils
-
-# Verify collections are installed
-ansible-galaxy collection list | grep -E "(posix|general|kubernetes|utils)"
-```
-
-### Issue: Ansible Filter Not Available
-```bash
-# If you see "Could not load 'ansible.utils.ipaddr'" error
-
-# Install the ansible.utils collection
-ansible-galaxy collection install ansible.utils
-
-# Install required Python library
-pip install netaddr
-
-# Verify filter is available
-ansible -m debug -a "msg={{ '127.0.0.1' | ansible.utils.ipaddr }}" localhost
-```
-
-### Issue: Python Library Missing for Ansible Filters
-```bash
-# If you see "Failed to import the required Python library (netaddr)"
-
-# Install netaddr in your virtual environment
-source .venv/bin/activate
-pip install netaddr
-
-# Verify installation
-python3 -c "import netaddr; print('netaddr available')"
 ```
 
 ---

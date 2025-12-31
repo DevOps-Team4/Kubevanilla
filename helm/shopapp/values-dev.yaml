@@ -1,0 +1,64 @@
+# Development environment values for shopapp
+
+global:
+  environment: development
+
+# PostgreSQL - smaller resources for dev
+postgresql:
+  persistence:
+    size: 5Gi
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# Backend - single replica for dev
+backend:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: false
+
+# Frontend - single replica for dev
+frontend:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+  autoscaling:
+    enabled: false
+
+# Ingress - dev domain
+ingress:
+  enabled: true
+  hosts:
+    - host: shopapp-dev.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: shopapp-dev-tls
+      hosts:
+        - shopapp-dev.example.com
+
+# Pod Disruption Budget - disabled for dev
+podDisruptionBudget:
+  enabled: false
+

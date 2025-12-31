@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shopapp.fullname" . }}-config
+  labels:
+    {{- include "shopapp.labels" . | nindent 4 }}
+data:
+  environment: {{ .Values.global.environment | quote }}
+  app.name: {{ .Chart.Name | quote }}
+  app.version: {{ .Chart.AppVersion | quote }}
+

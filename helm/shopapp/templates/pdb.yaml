@@ -1,0 +1,45 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+{{- if .Values.backend.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "shopapp.fullname" . }}-backend-pdb
+  labels:
+    {{- include "shopapp.labels" . | nindent 4 }}
+    component: backend
+spec:
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "shopapp.selectorLabels" . | nindent 6 }}
+      component: backend
+---
+{{- end }}
+{{- if .Values.frontend.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "shopapp.fullname" . }}-frontend-pdb
+  labels:
+    {{- include "shopapp.labels" . | nindent 4 }}
+    component: frontend
+spec:
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "shopapp.selectorLabels" . | nindent 6 }}
+      component: frontend
+---
+{{- end }}
+{{- end }}
+

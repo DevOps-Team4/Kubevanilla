@@ -1,0 +1,81 @@
+# Production environment values for shopapp
+
+global:
+  environment: production
+
+# PostgreSQL - production resources
+postgresql:
+  persistence:
+    size: 50Gi
+    storageClass: "standard"
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+# Backend - multiple replicas with autoscaling
+backend:
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1000m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Frontend - multiple replicas with autoscaling
+frontend:
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+# Ingress - production domain
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: shopapp.production.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: shopapp-prod-tls
+      hosts:
+        - shopapp.production.com
+
+# Pod Disruption Budget - enabled for production
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Network Policy - enabled for production
+networkPolicy:
+  enabled: true
+
