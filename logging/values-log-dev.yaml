@@ -1,0 +1,62 @@
+elasticsearch:
+  replicas: 1
+  minimumMasterNodes: 1
+  
+  protocol: http
+  esConfig:
+    elasticsearch.yml: |
+      xpack.security.enabled: false
+      xpack.security.transport.ssl.enabled: false
+      xpack.security.http.ssl.enabled: false
+
+  esJavaOpts: "-Xmx512m -Xms512m"
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "1.5Gi"
+
+  volumeClaimTemplate:
+    accessModes: [ "ReadWriteOnce" ]
+    resources:
+      requests:
+        storage: 5Gi
+
+kibana:
+  replicas: 1
+  elasticsearchHosts: "http://elasticsearch-master:9200"
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    hosts:
+      - host: kibana.35.207.106.1.nip.io
+        paths:
+          - path: /
+
+fluent-bit:
+  config:
+    outputs: |
+      [OUTPUT]
+          Name            es
+          Match           *
+          Host            elasticsearch-master
+          Port            9200
+          HTTP_User       elastic
+          HTTP_Passwd     changeme
+          Logstash_Format On
+          Replace_Dots    On
+          Retry_Limit     False
+          Suppress_Type_Name On
+          tls             Off
