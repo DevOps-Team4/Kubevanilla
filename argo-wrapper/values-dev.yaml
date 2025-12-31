@@ -1,0 +1,11 @@
+server:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  ingress:
+    hostname: argocd.35.207.106.1.nip.io  

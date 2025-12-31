@@ -4,7 +4,7 @@
 
 # Kubernetes version (without 'v' prefix)
 # Note: Current Kubespray requires minimum Kubernetes 1.32.0
-kube_version: 1.32.0
+kube_version: "v1.32.0"
 
 # Container runtime (containerd is recommended)
 container_manager: containerd

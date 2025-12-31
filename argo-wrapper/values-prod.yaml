@@ -1,0 +1,28 @@
+server:
+  replicas: 3
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 5
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  ingress:
+    hosts:
+      - argocd.sytoss.com
+    
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    tls:
+      - secretName: argocd-tls
+        hosts:
+          - argocd.sytoss.com

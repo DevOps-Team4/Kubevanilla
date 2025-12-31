@@ -52,7 +52,7 @@ source "$VENV_DIR/bin/activate"
 # Verify SSH connectivity
 echo -e "${GREEN}Verifying SSH connectivity to nodes...${NC}"
 echo -e "${YELLOW}Testing bastion host...${NC}"
-if ssh -i ~/.ssh/provisioning_key -o StrictHostKeyChecking=no -o ConnectTimeout=5 provisioning@34.159.39.161 "echo 'Bastion accessible'" 2>/dev/null; then
+if ssh -i ~/.ssh/provisioning_key -o StrictHostKeyChecking=no -o ConnectTimeout=5 provisioning@34.107.25.116 "echo 'Bastion accessible'" 2>/dev/null; then
     echo -e "${GREEN}✓ Bastion host is accessible${NC}"
 else
     echo -e "${RED}✗ Cannot connect to bastion host${NC}"
