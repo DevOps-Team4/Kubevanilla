@@ -1,7 +1,9 @@
 elasticsearch:
   replicas: 1
   minimumMasterNodes: 1
-  
+
+  clusterHealthCheckParams: "wait_for_status=yellow&timeout=1s"
+
   protocol: http
   esConfig:
     elasticsearch.yml: |
@@ -10,7 +12,7 @@ elasticsearch:
       xpack.security.http.ssl.enabled: false
 
   esJavaOpts: "-Xmx512m -Xms512m"
-  
+
   resources:
     requests:
       cpu: "100m"
