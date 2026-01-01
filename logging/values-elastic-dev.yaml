@@ -7,10 +7,6 @@ elasticsearch:
 
   protocol: https
 
-  esConfig:
-    elasticsearch.yml: |
-      discovery.type: single-node
-
   esJavaOpts: "-Xmx512m -Xms512m"
 
   resources:
@@ -42,7 +38,6 @@ fluent-bit:
           HTTP_Passwd     ZTDyL08jIvq1dbJj
 
           Logstash_Format On
-          Replace_Dots    On
           Replace_Dots    On
           Retry_Limit     False
           Suppress_Type_Name On
