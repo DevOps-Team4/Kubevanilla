@@ -1,6 +1,6 @@
 elasticsearch:
   secret:
-    password: "ZTDyL08jIvq1dbJj"
+    password: "KAF8L4cElVT8GTgd"
   createCert: true
   replicas: 1
   minimumMasterNodes: 1
@@ -37,7 +37,7 @@ fluent-bit:
           tls.verify      Off
 
           HTTP_User       elastic
-          HTTP_Passwd     ZTDyL08jIvq1dbJj
+          HTTP_Passwd     KAF8L4cElVT8GTgd
 
           Logstash_Format On
           Replace_Dots    On
