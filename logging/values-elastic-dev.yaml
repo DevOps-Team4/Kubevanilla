@@ -39,7 +39,7 @@ fluent-bit:
           tls.verify      Off
 
           HTTP_User       elastic
-          HTTP_Passwd     changeme
+          HTTP_Passwd     ZTDyL08jIvq1dbJj
 
           Logstash_Format On
           Replace_Dots    On
