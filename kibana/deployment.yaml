@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kibana
-  namespace: logging
+  namespace: log-elastic
 spec:
   replicas: 1
   selector:
@@ -15,12 +15,20 @@ spec:
     spec:
       containers:
         - name: kibana
-          image: docker.elastic.co/kibana/kibana:8.5.1
+          image: docker.elastic.co/kibana/kibana:7.17.3
           ports:
             - containerPort: 5601
           env:
             - name: ELASTICSEARCH_HOSTS
-              value: "http://elasticsearch-master:9200"
+              value: "https://elasticsearch-master:9200"
+            - name: ELASTICSEARCH_USERNAME
+              value: "kibana_system"
+            - name: ELASTICSEARCH_PASSWORD
+              value: "KAF8L4cElVT8GTgd"
+            - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
+              value: "none"
+            - name: SERVER_PUBLICBASEURL
+              value: "http://kibana.35.207.106.1.nip.io"
           resources:
             requests:
               cpu: "100m"

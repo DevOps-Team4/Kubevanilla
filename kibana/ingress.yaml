@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: kibana
-  namespace: logging
+  namespace: log-elastic
 spec:
   ingressClassName: nginx
   rules:
