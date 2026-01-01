@@ -5,6 +5,13 @@ elasticsearch:
   replicas: 1
   minimumMasterNodes: 1
 
+  readinessProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 40
+    failureThreshold: 12
+    successThreshold: 1
+
   clusterHealthCheckParams: "wait_for_status=yellow&timeout=30s"
 
   protocol: https
