@@ -1,4 +1,6 @@
 elasticsearch:
+  secret:
+    password: "ZTDyL08jIvq1dbJj"
   createCert: true
   replicas: 1
   minimumMasterNodes: 1
