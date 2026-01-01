@@ -1,24 +1,14 @@
 elasticsearch:
+  createCert: true
   replicas: 1
   minimumMasterNodes: 1
 
-  protocol: http
-
-  createCert: false
-
-  secret:
-    enabled: false
-
-  tls:
-    enabled: false
-
   clusterHealthCheckParams: "wait_for_status=yellow&timeout=1s"
+
+  protocol: https
 
   esConfig:
     elasticsearch.yml: |
-      xpack.security.enabled: false
-      xpack.security.transport.ssl.enabled: false
-      xpack.security.http.ssl.enabled: false
       discovery.type: single-node
 
   esJavaOpts: "-Xmx512m -Xms512m"
@@ -45,8 +35,14 @@ fluent-bit:
           Match           *
           Host            elasticsearch-master
           Port            9200
+          tls             On
+          tls.verify      Off
+
+          HTTP_User       elastic
+          HTTP_Passwd     changeme
+
           Logstash_Format On
+          Replace_Dots    On
           Replace_Dots    On
           Retry_Limit     False
           Suppress_Type_Name On
-          tls             Off
