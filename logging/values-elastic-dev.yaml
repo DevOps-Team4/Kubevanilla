@@ -25,27 +25,6 @@ elasticsearch:
       requests:
         storage: 5Gi
 
-kibana:
-  replicas: 1
-  elasticsearchHosts: "http://elasticsearch-master:9200"
-  elasticsearchCertificateSecret: "" 
-
-  resources:
-    requests:
-      cpu: "100m"
-      memory: "512Mi"
-    limits:
-      cpu: "1000m"
-      memory: "1Gi"
-  
-  ingress:
-    enabled: true
-    className: "nginx"
-    hosts:
-      - host: kibana.35.207.106.1.nip.io
-        paths:
-          - path: /
-
 fluent-bit:
   config:
     outputs: |
