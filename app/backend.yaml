@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/martahentosh/bookstore-backend:a13e254 
+          image: ghcr.io/martahentosh/bookstore-backend:f1f3e31
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
