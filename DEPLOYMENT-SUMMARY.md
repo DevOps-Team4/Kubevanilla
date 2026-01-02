@@ -274,6 +274,7 @@ k8s-worker-2   Ready    <none>          40m   v1.34.3
 if something goes wrong
 ansible-playbook   -i inventory.ini   playbooks/setup-kubeconfig.yml   --vault-password-file .vault_pass
 
+check inventory also and k8s-inventory
 ## ✅ Verification Commands
 
 ### Check Infrastructure

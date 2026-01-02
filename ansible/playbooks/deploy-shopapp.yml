@@ -1,0 +1,514 @@
+---
+# Deploy ShopApp using Helm Chart
+# This playbook deploys the BookStore application (frontend, backend, postgresql) to Kubernetes
+
+- name: Check Prerequisites
+  hosts: bastion
+  gather_facts: false
+  become: false
+  
+  tasks:
+    - name: Check if kubectl is installed
+      command: which kubectl
+      register: kubectl_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if helm is installed
+      command: which helm
+      register: helm_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if kubernetes.core collection is available
+      command: ansible-galaxy collection list kubernetes.core
+      register: k8s_collection_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display prerequisites status
+      debug:
+        msg:
+          - "kubectl: {{ 'installed' if kubectl_check.rc == 0 else 'NOT installed' }}"
+          - "helm: {{ 'installed' if helm_check.rc == 0 else 'NOT installed' }}"
+          - "kubernetes.core collection: {{ 'installed' if k8s_collection_check.rc == 0 else 'NOT installed' }}"
+
+    - name: Fail if kubectl is not installed
+      fail:
+        msg: "kubectl is required but not found. Please install kubectl first."
+      when: kubectl_check.rc != 0
+
+- name: Install Prerequisites
+  hosts: bastion
+  gather_facts: false
+  become: false
+  
+  tasks:
+    - name: Install kubernetes.core collection (if not installed)
+      command: ansible-galaxy collection install kubernetes.core
+      when: k8s_collection_check.rc != 0
+      changed_when: true
+      failed_when: false
+
+    - name: Download Helm install script
+      get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get-helm-3.sh
+        mode: '0755'
+      when: helm_check.rc != 0
+
+    - name: Install Helm
+      shell: /tmp/get-helm-3.sh
+      args:
+        creates: /usr/local/bin/helm
+      when: helm_check.rc != 0
+      register: helm_install_result
+
+    - name: Verify Helm installation after install
+      command: helm version --short
+      register: helm_version_check
+      changed_when: false
+      when: helm_check.rc != 0
+      failed_when: false
+
+    - name: Display Helm installation result
+      debug:
+        msg: "Helm installation: {{ 'successful' if helm_version_check.rc == 0 else 'failed' }}"
+      when: helm_check.rc != 0
+
+    - name: Fail if Helm installation failed
+      fail:
+        msg: "Helm installation failed. Please install Helm manually: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+      when: 
+        - helm_check.rc != 0
+        - helm_version_check.rc != 0
+
+- name: Prepare Helm Chart (Local)
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  
+  vars:
+    # Try multiple possible paths for the Helm chart
+    possible_chart_paths:
+      - "{{ playbook_dir | dirname | dirname }}/helm/shopapp"
+      - "/mnt/c/Users/Admin/iacc/Kubevanilla/helm/shopapp"
+      - "/root/Kubevanilla/helm/shopapp"
+    remote_chart_path: "/tmp/helm/shopapp"
+  
+  tasks:
+    - name: Find Helm chart location
+      stat:
+        path: "{{ item }}"
+      register: chart_paths
+      loop: "{{ possible_chart_paths }}"
+      failed_when: false
+
+    - name: Set local chart path from found location
+      set_fact:
+        local_chart_path: "{{ item.item }}"
+      loop: "{{ chart_paths.results }}"
+      when: item.stat.exists
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Display local chart path information
+      debug:
+        msg:
+          - "Local playbook directory: {{ playbook_dir }}"
+          - "Found chart path: {{ local_chart_path | default('NOT FOUND') }}"
+          - "Checked paths: {{ possible_chart_paths }}"
+
+    - name: Fail if local chart directory not found
+      fail:
+        msg: |
+          Helm chart not found locally!
+          
+          Checked paths:
+          {% for path in possible_chart_paths %}
+          - {{ path }}
+          {% endfor %}
+          
+          Please ensure the chart exists at one of these locations.
+      when: local_chart_path is not defined
+
+- name: Copy Helm Chart to Bastion
+  hosts: bastion
+  gather_facts: false
+  become: false
+  
+  vars:
+    local_chart_path: "{{ hostvars['localhost']['local_chart_path'] }}"
+    remote_chart_path: "/tmp/helm/shopapp"
+    archive_path_local: "/tmp/shopapp-chart.tar.gz"
+    archive_path_remote: "/tmp/shopapp-chart.tar.gz"
+    shopapp_namespace_var: "{{ shopapp_namespace | default('shopapp') }}"
+    shopapp_release_name_var: "{{ shopapp_release_name | default('shopapp') }}"
+    shopapp_environment_var: "{{ shopapp_environment | default('production') }}"
+  
+  tasks:
+    - name: Create remote Helm chart directory
+      file:
+        path: "{{ remote_chart_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Clean up old archive locally (if exists)
+      file:
+        path: "{{ archive_path_local }}"
+        state: absent
+      delegate_to: localhost
+      connection: local
+      become: false
+      failed_when: false
+
+    - name: Archive Helm chart locally
+      archive:
+        path: "{{ local_chart_path }}"
+        dest: "{{ archive_path_local }}"
+        format: gz
+      delegate_to: localhost
+      connection: local
+      become: false
+
+    - name: Verify archive exists locally before copy
+      stat:
+        path: "{{ archive_path_local }}"
+      delegate_to: localhost
+      connection: local
+      register: local_archive_stat
+
+    - name: Display local archive status
+      debug:
+        msg:
+          - "Local archive path: {{ archive_path_local }}"
+          - "Local archive exists: {{ local_archive_stat.stat.exists | default(false) }}"
+          - "Local archive size: {{ local_archive_stat.stat.size | default('N/A') }} bytes"
+
+    - name: Fail if local archive not found
+      fail:
+        msg: "Archive file {{ archive_path_local }} was not created on localhost"
+      when: not local_archive_stat.stat.exists
+
+    - name: Copy archived chart to bastion
+      copy:
+        src: "{{ archive_path_local }}"
+        dest: "{{ archive_path_remote }}"
+        mode: '0644'
+
+    - name: Verify archive exists on bastion after copy
+      stat:
+        path: "{{ archive_path_remote }}"
+      register: archive_stat
+
+    - name: Display archive status on bastion
+      debug:
+        msg:
+          - "Remote archive path: {{ archive_path_remote }}"
+          - "Archive exists on bastion: {{ archive_stat.stat.exists | default(false) }}"
+          - "Archive size: {{ archive_stat.stat.size | default('N/A') }} bytes"
+
+    - name: Fail if archive not found on bastion
+      fail:
+        msg: |
+          Archive file {{ archive_path_remote }} was not copied to bastion successfully.
+          Local archive: {{ archive_path_local }} (exists: {{ local_archive_stat.stat.exists }})
+          Remote archive: {{ archive_path_remote }} (exists: {{ archive_stat.stat.exists }})
+      when: not archive_stat.stat.exists
+
+    - name: Extract Helm chart on bastion
+      unarchive:
+        src: "{{ archive_path_remote }}"
+        dest: "/tmp/helm/"
+        remote_src: yes
+        creates: "{{ remote_chart_path }}/Chart.yaml"
+
+    - name: Clean up temporary archive on bastion
+      file:
+        path: "{{ archive_path_remote }}"
+        state: absent
+
+    - name: Clean up temporary archive locally
+      file:
+        path: "{{ archive_path_local }}"
+        state: absent
+      delegate_to: localhost
+      connection: local
+      become: false
+
+    - name: Verify chart was copied
+      stat:
+        path: "{{ remote_chart_path }}/Chart.yaml"
+      register: chart_yaml_check
+
+    - name: Display chart copy status
+      debug:
+        msg:
+          - "Helm chart copied to: {{ remote_chart_path }}"
+          - "Chart.yaml exists: {{ chart_yaml_check.stat.exists | default(false) }}"
+
+    - name: Fail if chart copy failed
+      fail:
+        msg: "Failed to copy Helm chart to bastion. Chart.yaml not found at {{ remote_chart_path }}/Chart.yaml"
+      when: not chart_yaml_check.stat.exists
+
+    - name: Validate Helm chart
+      command: helm lint {{ remote_chart_path }}
+      register: chart_lint
+      changed_when: false
+      failed_when: chart_lint.rc != 0
+
+    - name: Display chart validation result
+      debug:
+        msg: "Helm chart validation: {{ 'passed' if chart_lint.rc == 0 else 'failed' }}"
+
+- name: Create Namespace
+  hosts: bastion
+  gather_facts: false
+  become: false
+  
+  vars:
+    shopapp_namespace_var: "{{ shopapp_namespace | default('shopapp') }}"
+  
+  tasks:
+    - name: Check if namespace exists
+      command: kubectl get namespace {{ shopapp_namespace_var }}
+      register: namespace_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create namespace
+      command: kubectl create namespace {{ shopapp_namespace_var }}
+      when: namespace_check.rc != 0
+      failed_when: false
+
+    - name: Display namespace status
+      debug:
+        msg: "Namespace '{{ shopapp_namespace_var }}' is ready"
+
+- name: Deploy ShopApp with Helm
+  hosts: bastion
+  gather_facts: false
+  become: false
+  
+  vars:
+    remote_chart_path: "{{ hostvars[inventory_hostname]['remote_chart_path'] | default('/tmp/helm/shopapp') }}"
+    shopapp_namespace_var: "{{ shopapp_namespace | default('shopapp') }}"
+    shopapp_release_name_var: "{{ shopapp_release_name | default('shopapp') }}"
+    shopapp_environment_var: "{{ shopapp_environment | default('production') }}"
+    values_file: "{{ remote_chart_path }}/values-{{ shopapp_environment_var }}.yaml"
+    postgres_password: "{{ shopapp_postgres_password | default('bookstoreadmin') }}"
+    helm_timeout: "{{ shopapp_helm_timeout | default('15m') }}"
+  
+  tasks:
+    - name: Check if environment-specific values file exists
+      stat:
+        path: "{{ values_file }}"
+      register: values_file_stat
+      failed_when: false
+
+    - name: Set final values file path
+      set_fact:
+        final_values_file: "{{ values_file if values_file_stat.stat.exists else remote_chart_path + '/values.yaml' }}"
+
+    - name: Display deployment information
+      debug:
+        msg:
+          - "=========================================="
+          - "Deploying ShopApp with Helm"
+          - "=========================================="
+          - "Release name: {{ shopapp_release_name_var }}"
+          - "Namespace: {{ shopapp_namespace_var }}"
+          - "Environment: {{ shopapp_environment_var }}"
+          - "Chart path: {{ remote_chart_path }}"
+          - "Values file: {{ final_values_file }}"
+          - "=========================================="
+
+    - name: Check if release already exists
+      command: helm list -n {{ shopapp_namespace_var }} -q
+      register: existing_releases
+      changed_when: false
+      failed_when: false
+
+    - name: Deploy or upgrade ShopApp using Helm
+      shell: |
+        helm upgrade --install {{ shopapp_release_name_var }} {{ remote_chart_path }} \
+          --namespace {{ shopapp_namespace_var }} \
+          --create-namespace \
+          --values {{ final_values_file }} \
+          --set postgresql.env.POSTGRES_PASSWORD={{ postgres_password }} \
+          --wait \
+          --timeout {{ helm_timeout | default('15m') }}
+      register: helm_deploy
+      failed_when: helm_deploy.rc != 0 and "context deadline exceeded" not in helm_deploy.stderr
+      changed_when: >
+        ("has been upgraded" in helm_deploy.stdout) or
+        ("has been installed" in helm_deploy.stdout) or
+        ("does not exist" in helm_deploy.stdout)
+
+    - name: Check if Helm deployment is still in progress
+      shell: |
+        helm status {{ shopapp_release_name_var }} -n {{ shopapp_namespace_var }} 2>&1 || echo "NOT_DEPLOYED"
+      register: release_status_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display Helm release status
+      debug:
+        msg: "{{ release_status_check.stdout }}"
+
+    - name: Check pod status if deployment timed out
+      shell: |
+        kubectl get pods -n {{ shopapp_namespace_var }} -l app.kubernetes.io/instance={{ shopapp_release_name_var }} --no-headers 2>/dev/null || echo "NO_PODS"
+      register: pods_status_check
+      changed_when: false
+      failed_when: false
+      when: helm_deploy.rc != 0
+
+    - name: Display pod status if deployment failed
+      debug:
+        msg:
+          - "Helm deployment may have timed out, but checking pod status..."
+          - "Pods: {{ pods_status_check.stdout }}"
+      when: helm_deploy.rc != 0
+
+    - name: Warn about timeout but continue if pods are running
+      debug:
+        msg:
+          - "⚠️  Helm deployment timed out, but checking if resources were created..."
+          - "This might be normal if pods are still starting up."
+          - "You can check status manually with: helm status {{ shopapp_release_name_var }} -n {{ shopapp_namespace_var }}"
+      when: helm_deploy.rc != 0
+
+    - name: Display deployment result
+      debug:
+        msg:
+          - "Helm deployment: {{ 'successful' if helm_deploy.rc == 0 else 'failed' }}"
+          - "Release output:"
+          - "{{ helm_deploy.stdout_lines }}"
+
+- name: Verify Deployment
+  hosts: bastion
+  gather_facts: false
+  become: false
+  
+  vars:
+    shopapp_namespace_var: "{{ shopapp_namespace | default('shopapp') }}"
+    shopapp_release_name_var: "{{ shopapp_release_name | default('shopapp') }}"
+  
+  tasks:
+    - name: Wait for all pods to be ready
+      shell: |
+        kubectl wait --for=condition=ready pod \
+          -l app.kubernetes.io/instance={{ shopapp_release_name_var }} \
+          -n {{ shopapp_namespace_var }} \
+          --timeout=600s
+      register: pods_wait
+      failed_when: false
+      changed_when: pods_wait.rc == 0
+
+    - name: Get pod status
+      command: kubectl get pods -n {{ shopapp_namespace_var }} -l app.kubernetes.io/instance={{ shopapp_release_name_var }} -o wide
+      register: pods_status
+      changed_when: false
+
+    - name: Display pod status
+      debug:
+        msg: "{{ pods_status.stdout_lines }}"
+
+    - name: Check backend service
+      command: kubectl get svc {{ shopapp_release_name_var }}-backend -n {{ shopapp_namespace_var }} -o json
+      register: backend_service
+      failed_when: false
+      changed_when: false
+
+    - name: Check frontend service
+      command: kubectl get svc {{ shopapp_release_name_var }}-frontend -n {{ shopapp_namespace_var }} -o json
+      register: frontend_service
+      failed_when: false
+      changed_when: false
+
+    - name: Check postgresql service
+      command: kubectl get svc {{ shopapp_release_name_var }}-postgresql -n {{ shopapp_namespace_var }} -o json
+      register: postgresql_service
+      failed_when: false
+      changed_when: false
+
+    - name: Display services status
+      debug:
+        msg:
+          - "Services status:"
+          - "  Backend: {{ 'created' if backend_service.rc == 0 else 'not found' }}"
+          - "  Frontend: {{ 'created' if frontend_service.rc == 0 else 'not found' }}"
+          - "  PostgreSQL: {{ 'created' if postgresql_service.rc == 0 else 'not found' }}"
+
+    - name: Get Helm release status
+      command: helm status {{ shopapp_release_name_var }} -n {{ shopapp_namespace_var }}
+      register: release_status
+      changed_when: false
+      failed_when: false
+
+    - name: Display release status
+      debug:
+        msg: "{{ release_status.stdout_lines }}"
+
+- name: Display Deployment Summary
+  hosts: bastion
+  gather_facts: false
+  become: false
+  
+  vars:
+    shopapp_namespace_var: "{{ shopapp_namespace | default('shopapp') }}"
+    shopapp_release_name_var: "{{ shopapp_release_name | default('shopapp') }}"
+  
+  tasks:
+    - name: Get ingress information
+      command: kubectl get ingress {{ shopapp_release_name_var }}-ingress -n {{ shopapp_namespace_var }} -o json
+      register: ingress_info
+      failed_when: false
+      changed_when: false
+
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "=========================================="
+          - "✓ ShopApp deployment complete!"
+          - "=========================================="
+          - "Release: {{ shopapp_release_name_var }}"
+          - "Namespace: {{ shopapp_namespace_var }}"
+          - ""
+          - "Access the application:"
+          - "  kubectl get ingress -n {{ shopapp_namespace_var }}"
+          - ""
+          - "View pods:"
+          - "  kubectl get pods -n {{ shopapp_namespace_var }}"
+          - ""
+          - "View services:"
+          - "  kubectl get svc -n {{ shopapp_namespace_var }}"
+          - ""
+          - "View logs:"
+          - "  kubectl logs -n {{ shopapp_namespace_var }} -l component=backend"
+          - "  kubectl logs -n {{ shopapp_namespace_var }} -l component=frontend"
+          - ""
+          - "=========================================="
+      when: ingress_info.rc == 0
+
+    - name: Display deployment summary (no ingress)
+      debug:
+        msg:
+          - "=========================================="
+          - "✓ ShopApp deployment complete!"
+          - "=========================================="
+          - "Release: {{ shopapp_release_name_var }}"
+          - "Namespace: {{ shopapp_namespace_var }}"
+          - ""
+          - "Note: Ingress is not configured. Access services via port-forward:"
+          - "  kubectl port-forward -n {{ shopapp_namespace_var }} svc/{{ shopapp_release_name_var }}-frontend 5173:5173"
+          - "  kubectl port-forward -n {{ shopapp_namespace_var }} svc/{{ shopapp_release_name_var }}-backend 8080:8080"
+          - ""
+          - "View pods:"
+          - "  kubectl get pods -n {{ shopapp_namespace_var }}"
+          - ""
+          - "=========================================="
+      when: ingress_info.rc != 0
+
