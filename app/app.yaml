@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookstore-backend
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bookstore-backend
+  template:
+    metadata:
+      labels:
+        app: bookstore-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/martahentosh/bookstore-backend:a13e254 
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            # Connecting to db
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service:5432/bookstore"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "postgres"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "password"
+            
+            # OpenTelemetry (Tracing & Correlation)
+            - name: OTEL_SERVICE_NAME
+              value: "bookstore-backend"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.observability.svc.cluster.local:4317"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookstore-backend
+  namespace: default
+spec:
+  selector:
+    app: bookstore-backend
+  ports:
+    - port: 80
+      targetPort: 8080
