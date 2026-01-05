@@ -40,6 +40,8 @@ spec:
               value: "otlp"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://tempo.tracing-dev.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
             - name: OTEL_METRICS_EXPORTER
