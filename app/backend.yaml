@@ -27,7 +27,7 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               value: "password"
             - name: SPRING_SQL_INIT_MODE
-              value: "always"
+              value: "never"
 
             - name: jwt_secret
               value: "my_super_secret_key_for_jwt_tokens_12345"
