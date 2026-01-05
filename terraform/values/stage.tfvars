@@ -1,4 +1,4 @@
-project_id = "terraform-test-480809"   #This needs to be unique, change this before applying
+project_id = "hip-voyager-481321-p3"   #This needs to be unique, change this before applying
 region     = "europe-west3"
 environment = "stage"
 

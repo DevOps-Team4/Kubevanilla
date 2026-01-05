@@ -1,0 +1,95 @@
+# BookStore Monitoring Stack Configuration
+# Based on kube-prometheus-stack
+
+kube-prometheus-stack:
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      retention: 30d
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 50Gi
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      
+  # Grafana configuration
+  grafana:
+    enabled: true
+    adminPassword: "admin" # Change this!
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      hosts:
+        - grafana.bookstore.local
+      tls:
+        - secretName: grafana-tls
+          hosts:
+            - grafana.bookstore.local
+    
+    # Pre-configured dashboards
+    dashboards:
+      default:
+        kubernetes-cluster:
+          gnetId: 7249
+          revision: 1
+          datasource: Prometheus
+        node-exporter:
+          gnetId: 1860
+          revision: 29
+          datasource: Prometheus
+        postgres-exporter:
+          gnetId: 9628
+          revision: 7
+          datasource: Prometheus
+     
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 12h
+        receiver: 'default'
+      receivers:
+        - name: 'default'
+          # Add Slack, email, PagerDuty etc. here
+  
+  # Node Exporter
+  nodeExporter:
+    enabled: true
+  
+  # Kube State Metrics
+  kubeStateMetrics:
+    enabled: true
+
+# Application-specific monitoring
+serviceMonitors:
+  # Monitor Spring Boot backend
+  backend:
+    enabled: true
+    namespace: default
+    labels:
+      app: bookstore-backend
+    endpoints:
+      - port: http
+        path: /actuator/prometheus
+        interval: 30s
+  
+  # Monitor PostgreSQL
+  postgres:
+    enabled: true
+    namespace: default
+    labels:
+      app: postgres
+    endpoints:
+      - port: metrics
+        interval: 30s

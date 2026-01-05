@@ -1,0 +1,22 @@
+# Stage environment overrides
+
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            resources:
+              requests:
+                storage: 20Gi
+  
+  grafana:
+    adminPassword: "StagePass123!" 
+    ingress:
+      hosts:
+        - grafana-stage.bookstore.com
+      tls:
+        - secretName: grafana-stage-tls
+          hosts:
+            - grafana-stage.bookstore.com

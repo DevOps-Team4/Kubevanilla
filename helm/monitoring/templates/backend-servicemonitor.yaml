@@ -1,0 +1,20 @@
+{{- if .Values.serviceMonitors.backend.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: bookstore-backend
+  namespace: {{ .Values.serviceMonitors.backend.namespace }}
+  labels:
+    app: bookstore-backend
+    release: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: bookstore-backend
+  endpoints:
+    {{- range .Values.serviceMonitors.backend.endpoints }}
+    - port: {{ .port }}
+      path: {{ .path }}
+      interval: {{ .interval }}
+    {{- end }}
+{{- end }}
