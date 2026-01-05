@@ -26,8 +26,13 @@ spec:
               value: "postgres"
             - name: SPRING_DATASOURCE_PASSWORD
               value: "password"
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+
             - name: jwt_secret
-              value: "super_secret_key_for_testing_purposes_123"
+              value: "my_super_secret_key_for_jwt_tokens_12345"
+            - name: stripe.key.secret
+              value: "sk_test_dummy_key_for_startup_check"
 
             - name: OTEL_SERVICE_NAME
               value: "bookstore-backend"
@@ -35,6 +40,8 @@ spec:
               value: "otlp"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://tempo.tracing-dev.svc.cluster.local:4318"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
             - name: OTEL_METRICS_EXPORTER
               value: "none"
 ---
