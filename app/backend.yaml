@@ -30,7 +30,7 @@ spec:
               value: "never"
 
             - name: jwt_secret
-              value: "my_super_secret_key_for_jwt_tokens_12345"
+              value: "mysupersecretkeyforjwttokens"
             - name: stripe.key.secret
               value: "sk_test_dummy_key_for_startup_check"
 
@@ -39,7 +39,7 @@ spec:
             - name: OTEL_TRACES_EXPORTER
               value: "otlp"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://tempo.tracing-dev.svc.cluster.local:4318"
+              value: "http://tempo.tracing-dev.svc.cluster.local:4317"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
             - name: OTEL_METRICS_EXPORTER
